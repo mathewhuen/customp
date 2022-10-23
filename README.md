@@ -28,3 +28,9 @@ io-focused post function. The development goal for this function is to better
 support a file load -> file process -> file save workflow using both
 multiprocessing and multithreading in a general way.
 
+bmap speedtest:
+```python
+from customp.tests import bmap_stest
+bmap_stest(n_reps, n_procs)
+```
+
