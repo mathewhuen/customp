@@ -1,0 +1,12 @@
+# pip build
+build
+
+# pycache
+__pycache__
+
+# ide files
+.vs
+.idea
+
+# develop-mode build
+*.egg-info
