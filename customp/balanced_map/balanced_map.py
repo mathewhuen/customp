@@ -4,7 +4,6 @@
 
 import multiprocessing as mp
 from threading import Thread
-from collections import deque
 from tqdm import tqdm
 import signal
 from functools import partial
@@ -19,26 +18,26 @@ class ThreadManager(Thread):
     """Custom thread with continuous run method"""
     def __init__(
         self,
-        from_parent,
-        to_parent,
+        in_q,
+        out_q,
         fnc,
         fnc_kwargs=None,
         *args,
         **kwargs,
     ):
         super(ThreadManager, self).__init__(*args, **kwargs)
-        self.from_parent = from_parent
-        self.to_parent = to_parent
+        self.in_q = in_q
+        self.out_q = out_q
         self.fnc = fnc
         self.fnc_kwargs = ident(fnc_kwargs, dict())
 
     def run(self):
         while True:
-            msg = self.from_parent.get()
+            msg = self.in_q.get()
             if msg == 'end':
                 break
             res = self.fnc(msg, *self.fnc_kwargs)
-            self.to_parent.put(res)
+            self.out_q.put(res)
 
 
 def signal_override():
@@ -109,40 +108,57 @@ class ProcessManager:
         assert self.max_threads > 0
         pre_to = intra_to = post_to = None
         pre_from = intra_from = post_from = None
+        _data_start = _data_end = None
         if pre_threads is not None:
             if pre_fnc is None:
                 pre_fnc = lambda x: x
             pre_to, pre_from, pre_threads = self.create_threads(
+                to_threads=None,
                 n_threads=pre_threads,
                 fnc=pre_fnc,
                 fnc_kwargs=pre_kwargs,
             )
+            _data_start = pre_to
+            _data_end = pre_from
         if intra_threads is not None:
             if intra_fnc is None:
                 intra_fnc = lambda x: x
             intra_to, intra_from, intra_threads = self.create_threads(
+                to_threads=_data_end,
                 n_threads=intra_threads,
                 fnc=intra_fnc,
                 fnc_kwargs=intra_kwargs,
             )
+            if _data_start is None:
+                _data_start = intra_to
+            _data_end = intra_from
         if post_threads is not None:
             if post_fnc is None:
                 post_fnc = lambda x: x
             post_to, post_from, post_threads = self.create_threads(
+                to_threads=_data_end,
                 n_threads=post_threads,
                 fnc=post_fnc,
                 fnc_kwargs=post_kwargs,
             )
+            if _data_start is None:
+                _data_start = post_to
+            _data_end = post_from
+        if _data_start is None:
+            # no processing: return results as they come
+            self.data_start = self.data_end = mp.Queue
+        else:
+            self.data_start = _data_start
+            self.data_end = _data_end
         self._to = PreIntraPost(pre_to, intra_to, post_to)
         self._from = PreIntraPost(pre_from, intra_from, post_from)
         self.threads = PreIntraPost(pre_threads, intra_threads, post_threads)
         self.preload = 10
-        self.cnt = PreIntraPost(0, 0, 0)
-        self.data = deque(list())
+        self.cnt = 0  # PreIntraPost(0, 0, 0)
         self.run()
 
-    def create_threads(self, n_threads, fnc, fnc_kwargs):
-        _to_threads = mp.Queue()
+    def create_threads(self, to_threads, n_threads, fnc, fnc_kwargs):
+        _to_threads = ident(to_threads, mp.Queue())
         _from_threads = mp.Queue()
         _threads = list()
         for _ in range(n_threads):
@@ -167,58 +183,27 @@ class ProcessManager:
     ):
         """
         Main processing loop for process.
-        Each loop, check:
-         - check for kill or end message
-         - if data can be added to the pre queue
-         - if there are pre results
-         - if there are pre results that can be added to the intra queue
-         - if there are intra results
-         - if there are intra results that can be added to the post queue
-         - if there are post results
-         pre, intra, and post functions are
         """
         while True:
-            # load data
-            if not self.q_in.empty():
-
-                # ! add preload/cnt check ! #
-
-                data = self.q_in.get()
+            # get data, parse for end, add to queue
+            if self.cnt < self.preload and not self.q_in.empty():
+                try:
+                    data = self.q_in.get(timeout=0.1)
+                except:
+                    continue
                 if isinstance(data, str) and data in ['end', 'kill']:
                     self.end_threads()
                     if data == 'kill':
                         print('\nProcess Killed')
                     break
-                self.data.append(data)
+                self.data_start.put(data)
+                self.cnt += 1
 
-            # assign data to processing fncs
-            res = None
-            is_result = False
-            res_post = None
-            if self.n_threads.pre is not None:
-                if self.cnt.pre <= self.preload and len(self.data) > 0:
-                    self._to.pre.put(self.data.popleft())
-                    self.cnt.pre += 1
-                if not self._from.pre.empty():
-                    res = self._from.pre.get()
-                    self.cnt.pre -= 1
-            if self.n_threads.intra is not None:  # ! assume >= 1 !#
-                if self.cnt.intra <= self.preload and res is not None:  # ! just add directly ! #
-                    self._to.intra.put(res)
-                    self.cnt.intra += 1
-                if not self._from.intra.empty():
-                    res = self._from.intra.get()
-                    self.cnt.intra -= 1
-            if self.n_threads.post is not None:
-                if self.cnt.post <= self.preload and res is not None:
-                    self._to.post.put(res)
-                    self.cnt.post += 1
-                if not self._from.post.empty():
-                    res_post = self._from.post.get()
-                    self.cnt.post -= 1
-                    is_result = True
-            if is_result:
-                self.q_out.put(res_post)
+            # check for finished data
+            if not self.data_end.empty():
+                res = self.data_end.get()
+                self.cnt -= 1
+                self.q_out.put(res)
 
 
 def create_pool(
