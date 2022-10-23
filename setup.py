@@ -21,5 +21,6 @@ setup(
     url='https://github.com/mathewhuen/customp',
     packages=[
         'customp',
+        'customp.balanced_map',
     ],
 )
