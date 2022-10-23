@@ -1,7 +1,3 @@
-# TODO
-#   - fix None vs 1 for n_threads for pre, intra, post
-
-
 import multiprocessing as mp
 from threading import Thread
 from tqdm import tqdm
@@ -89,9 +85,9 @@ class ProcessManager:
         self,
         q_in,
         q_out,
-        pre_threads=None,
-        intra_threads=1,
-        post_threads=None,
+        n_pre_threads=None,
+        n_intra_threads=None,
+        n_post_threads=None,
         preload=10,
         pre_fnc=None,
         intra_fnc=None,
@@ -103,47 +99,46 @@ class ProcessManager:
         signal_override()
         self.q_in = q_in
         self.q_out = q_out
-        self.n_threads = PreIntraPost(pre_threads, intra_threads, post_threads)
-        self.max_threads = nmax(pre_threads, intra_threads, post_threads)
-        assert self.max_threads > 0
         pre_to = intra_to = post_to = None
         pre_from = intra_from = post_from = None
+        pre_threads = intra_threads = post_threads = None
         _data_start = _data_end = None
-        if pre_threads is not None:
-            if pre_fnc is None:
-                pre_fnc = lambda x: x
+
+        if pre_fnc is not None:
+            n_pre_threads = ident(n_pre_threads, 1)
             pre_to, pre_from, pre_threads = self.create_threads(
                 to_threads=None,
-                n_threads=pre_threads,
+                n_threads=n_pre_threads,
                 fnc=pre_fnc,
                 fnc_kwargs=pre_kwargs,
             )
             _data_start = pre_to
             _data_end = pre_from
-        if intra_threads is not None:
-            if intra_fnc is None:
-                intra_fnc = lambda x: x
+        if intra_fnc is not None:
+            n_intra_threads = ident(n_intra_threads, 1)
             intra_to, intra_from, intra_threads = self.create_threads(
                 to_threads=_data_end,
-                n_threads=intra_threads,
+                n_threads=n_intra_threads,
                 fnc=intra_fnc,
                 fnc_kwargs=intra_kwargs,
             )
             if _data_start is None:
                 _data_start = intra_to
             _data_end = intra_from
-        if post_threads is not None:
-            if post_fnc is None:
-                post_fnc = lambda x: x
+        if post_fnc is not None:
+            n_post_threads = ident(n_post_threads, 1)
             post_to, post_from, post_threads = self.create_threads(
                 to_threads=_data_end,
-                n_threads=post_threads,
+                n_threads=n_post_threads,
                 fnc=post_fnc,
                 fnc_kwargs=post_kwargs,
             )
             if _data_start is None:
                 _data_start = post_to
             _data_end = post_from
+
+        self.max_threads = nmax(n_pre_threads, n_intra_threads, n_post_threads)
+        assert self.max_threads > 0
         if _data_start is None:
             # no processing: return results as they come
             self.data_start = self.data_end = mp.Queue
@@ -208,9 +203,9 @@ class ProcessManager:
 
 def create_pool(
     n_procs,
-    pre_threads,
-    intra_threads,
-    post_threads,
+    n_pre_threads,
+    n_intra_threads,
+    n_post_threads,
     preload,
     pre_fnc,
     intra_fnc,
@@ -230,9 +225,9 @@ def create_pool(
                 kwargs={
                     'q_in': q_to,
                     'q_out': q_from,
-                    'pre_threads': pre_threads,
-                    'intra_threads': intra_threads,
-                    'post_threads': post_threads,
+                    'n_pre_threads': n_pre_threads,
+                    'n_intra_threads': n_intra_threads,
+                    'n_post_threads': n_post_threads,
                     'preload': preload,
                     'pre_fnc': pre_fnc,
                     'intra_fnc': intra_fnc,
@@ -308,9 +303,9 @@ def bmap(
 ):
     q_to, q_from, procs = create_pool(
         n_procs=n_procs,
-        pre_threads=pre_threads,
-        intra_threads=intra_threads,
-        post_threads=post_threads,
+        n_pre_threads=pre_threads,
+        n_intra_threads=intra_threads,
+        n_post_threads=post_threads,
         preload=preload,
         pre_fnc=pre_fnc,
         intra_fnc=intra_fnc,
