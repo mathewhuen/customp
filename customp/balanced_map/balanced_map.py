@@ -252,11 +252,13 @@ def pool_map(
     q_from,
     procs,
     return_result,
+    report_tqdm=True,
 ):
     load = 0
     finished = 0
     todo = len(data)
-    pbar = tqdm(total=len(data), smoothing=0.1)
+    if report_tqdm:
+        pbar = tqdm(total=len(data), smoothing=0.1)
     if return_result:
         result = list()
     try:
@@ -270,7 +272,8 @@ def pool_map(
                 finished += 1
                 if return_result:
                     result.append(res)
-                pbar.update()
+                if report_tqdm:
+                    pbar.update()
         for _ in range(len(procs)):
             q_to.put('end')
     except KeyboardInterrupt:
@@ -281,7 +284,8 @@ def pool_map(
     finally:
         for proc in procs:
             proc.join()
-        pbar.close()
+        if report_tqdm:
+            pbar.close()
     if return_result:
         return result
 
@@ -300,6 +304,7 @@ def bmap(
     intra_kwargs=None,
     post_kwargs=None,
     return_result=False,
+    report_tqdm=True,
 ):
     q_to, q_from, procs = create_pool(
         n_procs=n_procs,
@@ -321,6 +326,7 @@ def bmap(
         q_from=q_from,
         procs=procs,
         return_result=return_result,
+        report_tqdm=report_tqdm,
     )
     if return_result:
         return result
