@@ -148,7 +148,7 @@ class ProcessManager:
         self._to = PreIntraPost(pre_to, intra_to, post_to)
         self._from = PreIntraPost(pre_from, intra_from, post_from)
         self.threads = PreIntraPost(pre_threads, intra_threads, post_threads)
-        self.preload = 10
+        self.preload = preload
         self.cnt = 0  # PreIntraPost(0, 0, 0)
         self.run()
 
