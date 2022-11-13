@@ -46,6 +46,7 @@ def stest_(
     bmap_preload=40,
     use_tqdm=False,
 ):
+    n_data = len(data)
     bmap_times = list()
     for _ in range(reps):
         time0= now()
@@ -79,12 +80,15 @@ def stest_(
     mpmap_times = [end - start for start, end in mpmap_times]
     mpmap_mean = sum(mpmap_times) / len(mpmap_times)
 
-    return bmap_mean, mpmap_mean
+    bmap_mean_per = bmap_mean / n_data * n_procs
+    mpmap_mean_per = mpmap_mean / n_data * n_procs
+
+    return bmap_mean, bmap_mean_per, mpmap_mean, mpmap_mean_per
 
 
 def stest(reps, n_procs):
     n_data = 600
-    report = 'bmap mean time:  {}\nmp/imap mean time: {}\n'
+    report = 'bmap mean time:  {}\nper proc per inst: {}\nmp/imap mean time: {}\nper proc per inst: {}'
 
     print('\nProcessing Case 1: long load, short processing')
     data = [(1, 3)] * n_data
