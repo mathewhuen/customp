@@ -8,5 +8,6 @@ __pycache__
 .vs
 .idea
 
-# develop-mode build
+# build data
 *.egg-info
+build
