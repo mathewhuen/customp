@@ -14,6 +14,27 @@ __all__ = [
 ]
 
 
+class Pool:
+    def __init__(self, q_to, q_from, procs):
+        self.q_to = q_to
+        self.q_from = q_from
+        self.procs = procs
+        self.n_procs = len(procs)
+
+    def put(self, x):
+        self.q_to.put(x)
+
+    def get_empty(self):
+        return self.q_from.empty()
+
+    def get(self, block=True, timeout=None):
+        return self.q_from.get(block=block, timeout=timeout)
+
+    def join(self):
+        for proc in self.procs:
+            proc.join()
+
+
 def create_pool(
     n_procs,
     n_pre_threads,
@@ -55,15 +76,13 @@ def create_pool(
         print(e)
         for proc in procs:
             proc.join()
-    return q_to, q_from, procs
+    return Pool(q_to, q_from, procs)
 
 
 def pool_map(
     data,
     preload,
-    q_to,
-    q_from,
-    procs,
+    pool,
     return_result,
     report_tqdm=True,
 ):
@@ -71,32 +90,31 @@ def pool_map(
     finished = 0
     todo = len(data)
     if report_tqdm:
-        pbar = tqdm(total=len(data), smoothing=0.1)
+        pbar = tqdm(total=todo, smoothing=0.1)
     if return_result:
         result = list()
     try:
         while finished < todo:
             if len(data) > 0 and load < preload:
-                q_to.put(data.pop())
+                pool.put(data.pop())
                 load += 1
-            if not q_from.empty():
-                res = q_from.get()
+            if not pool.get_empty():
+                res = pool.get()
                 load -= 1
                 finished += 1
                 if return_result:
                     result.append(res)
                 if report_tqdm:
                     pbar.update()
-        for _ in range(len(procs)):
-            q_to.put('end')
+        for _ in range(pool.n_procs):
+            pool.put('end')
     except KeyboardInterrupt:
-        for _ in range(len(procs)):
-            q_to.put('kill')
+        for _ in range(pool.n_procs):
+            pool.put('kill')
     except Exception as e:
         print(e)
     finally:
-        for proc in procs:
-            proc.join()
+        pool.join()
         if report_tqdm:
             pbar.close()
     if return_result:
@@ -119,7 +137,7 @@ def bmap(
     return_result=False,
     report_tqdm=True,
 ):
-    q_to, q_from, procs = create_pool(
+    pool = create_pool(
         n_procs=n_procs,
         n_pre_threads=pre_threads,
         n_intra_threads=intra_threads,
@@ -135,9 +153,7 @@ def bmap(
     result = pool_map(
         data=data,
         preload=preload,
-        q_to=q_to,
-        q_from=q_from,
-        procs=procs,
+        pool=pool,
         return_result=return_result,
         report_tqdm=report_tqdm,
     )
