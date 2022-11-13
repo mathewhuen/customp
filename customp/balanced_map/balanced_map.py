@@ -4,6 +4,7 @@ from tqdm import tqdm
 from functools import partial
 
 
+from customp import get
 from .managers import ThreadManager, ProcessManager
 
 
@@ -81,7 +82,7 @@ def create_pool(
 
 def pool_map(
     data,
-    preload,
+    pool_preload,
     pool,
     return_result,
     report_tqdm=True,
@@ -95,7 +96,7 @@ def pool_map(
         result = list()
     try:
         while finished < todo:
-            if len(data) > 0 and load < preload:
+            if len(data) > 0 and load < pool_preload:
                 pool.put(data.pop())
                 load += 1
             if not pool.get_empty():
@@ -128,6 +129,7 @@ def bmap(
     intra_threads=1,
     post_threads=1,
     preload=10,
+    pool_preload=None,
     pre_fnc=None,
     intra_fnc=None,
     post_fnc=None,
@@ -137,6 +139,7 @@ def bmap(
     return_result=False,
     report_tqdm=True,
 ):
+    pool_preload = get(pool_preload, 2 * n_procs * preload)
     pool = create_pool(
         n_procs=n_procs,
         n_pre_threads=pre_threads,
@@ -152,7 +155,7 @@ def bmap(
     )
     result = pool_map(
         data=data,
-        preload=preload,
+        pool_preload=pool_preload,
         pool=pool,
         return_result=return_result,
         report_tqdm=report_tqdm,
