@@ -83,25 +83,25 @@ def stest_(
 
 
 def stest(reps, n_procs):
+    n_data = 600
+    report = 'bmap mean time:  {}\nmp/imap mean time: {}\n'
+
     print('\nProcessing Case 1: long load, short processing')
-    data = [(1, 3)] * 200
-    bmap_mean, mpmap_mean = stest_(reps, data, n_procs)
-    print('bmap mean time:\n{}\nmp/imap mean time:\n{}'.format(bmap_mean, mpmap_mean))
-    
+    data = [(1, 3)] * n_data
+    print(report.format(*stest_(reps, data, n_procs)))
+
     print('\nProcessing Case 2: short load, short processing')
-    data = [(0.05, 3)] * 200
-    bmap_mean, mpmap_mean = stest_(reps, data, n_procs)
-    print('bmap mean time:\n{}\nmp/imap mean time:\n{}'.format(bmap_mean, mpmap_mean))
+    data = [(0.05, 3)] * n_data
+    print(report.format(*stest_(reps, data, n_procs)))
 
     print('\nProcessing Case 3: short load, long processing')
-    data = [(0.05, 10_000)] * 200
-    bmap_mean, mpmap_mean = stest_(reps, data, n_procs)
-    print('bmap mean time:\n{}\nmp/imap mean time:\n{}'.format(bmap_mean, mpmap_mean))
+    data = [(0.05, 10_000)] * n_data
+    print(report.format(*stest_(reps, data, n_procs)))
 
     print('\nProcessing Case 4: long load, long processing')
-    data = [(1, 10_000)] * 200
-    bmap_mean, mpmap_mean = stest_(reps, data, n_procs)
-    print('bmap mean time:\n{}\nmp/imap mean time:\n{}'.format(bmap_mean, mpmap_mean))
+    data = [(1, 10_000)] * n_data
+    print(report.format(*stest_(reps, data, n_procs)))
+
 
 if __name__ == '__main__':
     reps = 3
