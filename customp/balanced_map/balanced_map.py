@@ -48,6 +48,8 @@ def create_pool(
     pre_kwargs,
     intra_kwargs,
     post_kwargs,
+    process_init_fnc,
+    process_init_kwargs,
 ):
     procs = list()
     try:
@@ -70,6 +72,8 @@ def create_pool(
                     'pre_kwargs': pre_kwargs,
                     'intra_kwargs': intra_kwargs,
                     'post_kwargs': post_kwargs,
+                    'process_init_fnc': process_init_fnc,
+                    'process_init_kwargs': process_init_kwargs,
                 },
             ))
             procs[-1].start()
@@ -138,6 +142,8 @@ def bmap(
     post_kwargs=None,
     return_result=False,
     report_tqdm=True,
+    process_init_fnc=None,
+    process_init_kwargs=None,
 ):
     pool_preload = get(pool_preload, 2 * n_procs * preload)
     pool = create_pool(
@@ -152,6 +158,8 @@ def bmap(
         pre_kwargs=pre_kwargs,
         intra_kwargs=intra_kwargs,
         post_kwargs=post_kwargs,
+        process_init_fnc=process_init_fnc,
+        process_init_kwargs=process_init_kwargs,
     )
     result = pool_map(
         data=data,

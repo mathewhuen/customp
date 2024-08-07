@@ -52,7 +52,13 @@ class ProcessManager:
         pre_kwargs=None,
         intra_kwargs=None,
         post_kwargs=None,
+        process_init_fnc=None,
+        process_init_kwargs=None,
     ):
+        if process_init_fnc is not None:
+            if process_init_kwargs is None:
+                process_init_kwargs = dict()
+            process_init_fnc(**process_init_kwargs)
         signal_override()
         self.q_in = q_in
         self.q_out = q_out
